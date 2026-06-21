@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use ReliFuse, please cite the accompanying manuscript."
+title: "ReliFuse: Reliability-Calibrated Posterior Fusion for Histological Vessel Segmentation"
+type: software
+authors:
+  - family-names: Le
+    given-names: Truong P.
+  - family-names: Nguyen
+    given-names: Truong N.
+  - family-names: Tran
+    given-names: Vinh Le H.
+  - family-names: Doan
+    given-names: Tram T.
+  - family-names: Nguyen
+    given-names: Binh T.
+  - family-names: Huynh
+    given-names: Son T.
+version: 0.1.0
+date-released: 2026-06-20
+license: MIT

@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Environments and notebooks
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Private data, generated outputs, and learned weights
+data/
+datasets/
+artifacts/
+outputs/
+checkpoints/
+models/
+runs/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.npy
+*.npz
+
+# Historical experiment notebooks/results are local research evidence, not release code.
+results/
+results_v*/
+
+# Local archive containing all pre-ReliFuse code, checkpoints, and experiment results.
+research_archive/
+
+# Archives and generated paper files
+*.zip
+*.tar
+*.tar.gz
+*.aux
+*.bbl
+*.blg
+*.out
+*.synctex.gz
