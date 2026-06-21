@@ -1,92 +1,73 @@
 # ReliFuse
 
-ReliFuse is a trainable **posterior-fusion head** for binary segmentation. It receives probability masks from frozen segmentation experts—never the source RGB image—and returns a reliability-calibrated fused posterior.
+**ReliFuse** is a reliability-calibrated posterior-fusion method for histological vessel segmentation. It combines probability maps from frozen segmentation experts, learns which expert is locally trustworthy, and only adjusts the fused posterior where the ensemble is ambiguous. The RGB image is never reused by the fusion head.
 
-This repository is organized as a small reusable library. The main path is intentionally model-agnostic: bring predictions from two, seven, or any number of existing segmenters; fit ReliFuse on a development split; then reuse the saved fusion checkpoint at inference time.
+<p align="center">
+  <img src="figures/relifuse_end_to_end_pipeline.png" alt="ReliFuse end-to-end pipeline" width="100%">
+</p>
 
-> Status: research release candidate. The implementation follows the attached manuscript's nine-channel diagnostic state and selected lightweight boundary-aware configuration. Paper checkpoints and the pulmonary histology dataset are not bundled.
+## Method
 
-## Why this release is library-first
+ReliFuse receives a fixed expert stack $P\in[0,1]^{B\times K\times H\times W}$ and performs four steps:
 
-The paper's base-model pipeline is useful for reproducing one experiment, but ReliFuse's reusable contribution begins after those models emit probability maps. Keeping that boundary explicit makes the repository useful outside pulmonary histology and prevents dataset paths, Kaggle state, and multi-gigabyte checkpoints from becoming hidden requirements.
+1. **Diversity-aware selection** builds a compact set of competent but non-redundant experts.
+2. **Diagnostic state extraction** summarizes consensus, minority evidence, disagreement, entropy, and boundary risk in nine interpretable channels.
+3. **Reliability-calibrated log-opinion pooling** forms a calibrated prior from bias-corrected expert logits, anchored by validation Dice priors.
+4. **Ambiguity-gated residual correction** applies a bounded correction only where needed:
 
-The package still includes the scientific pieces needed to retrain the fusion head:
+$$z_{\mathrm{out}}(x)=z(x)+U(x)\Delta(x).$$
 
-- validation-derived expert quality priors;
-- the nine diagnostic channels from the manuscript;
-- reliability-calibrated log-opinion pooling;
-- ambiguity-gated bounded residual correction;
-- the complete structure-aware objective;
-- optional diversity-aware expert selection;
-- early stopping, checkpoint I/O, CLI, tests, and an offline two-expert notebook.
+The fusion head is trained with segmentation, boundary, consensus-preservation, sparse-correction, and calibration losses; all base experts remain frozen.
 
-## Architecture
+<p align="center">
+  <img src="figures/relifuse_overall_architecture.png" alt="ReliFuse posterior-fusion architecture" width="100%">
+</p>
 
-```mermaid
-flowchart LR
-  I["Input image"] --> E1["Frozen expert 1"]
-  I --> E2["Frozen expert 2"]
-  I --> EK["Frozen expert K"]
-  E1 --> P["Probability stack [B,K,H,W]"]
-  E2 --> P
-  EK --> P
-  P --> S["Nine-channel diagnostic state"]
-  V["Validation Dice priors"] --> R["Reliability-calibrated log-opinion pool"]
-  P --> R
-  S --> R
-  R --> C["Calibrated prior"]
-  S --> A["Ambiguity field"]
-  C --> A
-  S --> D["Bounded residual correction"]
-  A --> D
-  C --> F["Fused probability mask"]
-  D --> F
-```
+## Results
 
-## Install
+Experiments use **517 development images** and **92 held-out test images** from the pulmonary histology benchmark. Posterior-fusion methods receive the same diversity-aware seven-expert probability stack. Values are held-out batch-level mean ± standard deviation.
 
-```bash
-git clone <your-repository-url>
-cd relifuse
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[demo,dev]"
-```
+| Method | Dice ↑ | IoU ↑ | Precision ↑ | Recall ↑ |
+|---|---:|---:|---:|---:|
+| Weighted fusion | 0.9187 ± 0.0244 | 0.8505 ± 0.0414 | 0.9233 ± 0.0305 | 0.9152 ± 0.0365 |
+| D-LEMA | 0.9225 ± 0.0210 | 0.8568 ± 0.0361 | 0.9193 ± 0.0328 | 0.9268 ± 0.0290 |
+| LC-Fed | 0.9223 ± 0.0222 | 0.8565 ± 0.0379 | 0.9219 ± 0.0325 | 0.9239 ± 0.0316 |
+| P-MoLE | 0.9222 ± 0.0210 | 0.8562 ± 0.0361 | 0.9145 ± 0.0318 | 0.9311 ± 0.0292 |
+| **ReliFuse** | **0.9241 ± 0.0139** | **0.8591 ± 0.0241** | 0.9194 ± 0.0299 | 0.9297 ± 0.0188 |
 
-Core installation only needs NumPy and PyTorch:
+*ReliFuse is the selected lightweight boundary-aware configuration; comparator rows follow the manuscript's final all-method evaluation.*
+
+ReliFuse achieves the strongest Dice and IoU among the evaluated posterior-fusion methods. Compared with validation-weighted fusion, it improves Dice by **0.0054**, IoU by **0.0086**, and recall by **0.0145**. Diversity-aware selection also improves ReliFuse Dice from **0.9198** with Top-7 experts to **0.9241**. Differences among the strongest learned methods are modest and are not always statistically significant.
+
+<p align="center">
+  <img src="figures/relifuse_main_qualitative_highlights.png" alt="ReliFuse qualitative highlights" width="100%">
+</p>
+
+The selected cases illustrate small-vessel recovery and ambiguity-aware removal of false-positive regions. Quantitative claims are based on the complete held-out evaluation, not these examples.
+
+<details>
+<summary>All-method mask comparison and additional diagnostics</summary>
+
+![All-method mask comparison](figures/relifuse_all_method_mask_comparison.png)
+
+![ReliFuse diagnostic maps](figures/relifuse_appendix_qualitative_diagnostics.png)
+
+</details>
+
+## Minimal usage
 
 ```bash
 python -m pip install -e .
 ```
 
-## Quick start: fuse your own masks
-
-ReliFuse expects **probabilities in `[0,1]`**, not thresholded masks or logits. The expert order must stay fixed between training and inference.
-
 ```python
-import torch
+from relifuse import ReliFuse, TrainingConfig, expert_dice_scores, fit, seed_everything
 
-from relifuse import (
-    ReliFuse,
-    TrainingConfig,
-    expert_dice_scores,
-    fit,
-    save_checkpoint,
-    seed_everything,
-)
-
-# Cached arrays: train/val predictions [N,K,H,W], targets [N,H,W].
-train_predictions = torch.load("train_posteriors.pt", weights_only=True)
-train_targets = torch.load("train_targets.pt", weights_only=True)
-val_predictions = torch.load("val_posteriors.pt", weights_only=True)
-val_targets = torch.load("val_targets.pt", weights_only=True)
-
-# batch_size=8 reproduces the paper's validation-prior metric protocol.
 quality = expert_dice_scores(val_predictions, val_targets, batch_size=8)
-seed_everything(42)  # Seed before constructing the trainable fusion head.
+seed_everything(42)
 model = ReliFuse(num_experts=train_predictions.shape[1], expert_scores=quality)
 
-history = fit(
+fit(
     model,
     train_predictions,
     train_targets,
@@ -94,98 +75,14 @@ history = fit(
     val_targets,
     config=TrainingConfig(epochs=50, batch_size=4, patience=10),
 )
-save_checkpoint(
-    "checkpoints/relifuse.pt",
-    model,
-    expert_names=["expert_a", "expert_b"],
-    metadata={"history": history.to_dict()},
-)
 
-# At inference, a Python list is accepted directly.
-final_probability = model.fuse([expert_a_probability, expert_b_probability])
-final_mask = model.fuse(
-    [expert_a_probability, expert_b_probability], threshold=0.5
-)
+fused_probability = model.fuse([expert_1_probability, expert_2_probability])
 ```
 
-Binary masks are technically valid inputs, but they discard the confidence and calibration information used by log-opinion pooling. Probability maps are strongly recommended.
-
-## Two-expert notebook
-
-[`notebooks/relifuse_two_experts.ipynb`](notebooks/relifuse_two_experts.ipynb) is an offline example with two lightweight toy segmentation models. It generates their posterior masks, derives validation priors, trains ReliFuse, and visualizes the fused output and ambiguity field. The toy models keep the example self-contained; replace them with your own frozen models without changing the ReliFuse calls.
-
-The same workflow is executable without Jupyter:
-
-```bash
-python examples/two_expert_demo.py
-```
-
-## Array CLI
-
-Train from cached NumPy arrays:
-
-```bash
-relifuse train \
-  --train-predictions train_predictions.npy \
-  --train-targets train_targets.npy \
-  --validation-predictions val_predictions.npy \
-  --validation-targets val_targets.npy \
-  --expert-name model_a --expert-name model_b \
-  --output checkpoints/relifuse.pt
-```
-
-Fuse one mask per expert, in checkpoint order:
-
-```bash
-relifuse fuse \
-  --checkpoint checkpoints/relifuse.pt \
-  --mask model_a_probability.npy \
-  --mask model_b_probability.npy \
-  --output fused_probability.npy
-```
-
-## Reproducing the method rather than only calling it
-
-Use a development partition that is disjoint from the final test set:
-
-1. Train or load base segmenters.
-2. Cache their probability maps with a stable channel order.
-3. Derive expert priors on validation data only.
-4. Fit ReliFuse on development posteriors and select its checkpoint on validation data.
-5. Freeze everything and evaluate the held-out test set once.
-
-The trainer selects the checkpoint with the **lowest validation loss**, matching Appendix H. Validation Dice is logged only as a convergence diagnostic.
-
-For the paper's expert-selection study, pass fold-wise Dice/recall tables and cached predictions to `select_experts(...)`. See [`docs/reproducibility.md`](docs/reproducibility.md) for protocol details.
-
-## Repository layout
-
-```text
-src/relifuse/       paper-aligned package and CLI
-tests/              fast unit and training smoke tests
-examples/           executable two-expert demo helpers
-notebooks/          thin end-to-end example notebook
-docs/               method, protocol, and architecture notes
-```
-
-Locally, all historical `results_v*`, old model weights, and the pre-ReliFuse MMF pipeline are grouped under `research_archive/`. That directory, cached masks, datasets, and generated outputs are intentionally excluded by `.gitignore`.
-
-## Validate the release
-
-```bash
-make test
-make lint
-make format-check
-```
+See the executed [two-expert notebook](notebooks/relifuse_two_experts.ipynb) and [reproducibility protocol](docs/reproducibility.md).
 
 ## Citation
 
-If this code supports your research, cite the accompanying manuscript:
-
 > Truong P. Le et al. *ReliFuse: Reliability-Calibrated Posterior Fusion for Histological Vessel Segmentation*.
 
-The machine-readable author list is in [`CITATION.cff`](CITATION.cff). Publication venue, year, DOI, and repository URL should be added there once final.
-
-## License
-
-MIT. See [`LICENSE`](LICENSE).
+Citation metadata is available in [CITATION.cff](CITATION.cff). This project is released under the [MIT License](LICENSE).

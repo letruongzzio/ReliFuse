@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Union
 
 import numpy as np
 import torch
 from torch import Tensor
 
-ArrayLike = Union[Tensor, np.ndarray]
-PredictionInput = Union[ArrayLike, Sequence[ArrayLike]]
+ArrayLike = Tensor | np.ndarray
+PredictionInput = ArrayLike | Sequence[ArrayLike]
 
 
 def _as_float_tensor(value: ArrayLike) -> Tensor:
