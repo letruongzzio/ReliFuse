@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReliFuse | Reliability-Calibrated Posterior Fusion</title>
+    <meta
+      name="description"
+      content="ReliFuse is a reliability-calibrated posterior-fusion method for histological vessel segmentation."
+    />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="ReliFuse home">ReliFuse</a>
+      <nav aria-label="Primary navigation">
+        <a href="#method">Method</a>
+        <a href="#demo">Demo</a>
+        <a href="#results">Results</a>
+        <a href="#citation">Citation</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Histological Vessel Segmentation</p>
+          <h1>ReliFuse: Reliability-Calibrated Posterior Fusion</h1>
+          <p class="lead">
+            A lightweight fusion head that combines frozen expert probability maps,
+            estimates local reliability, and only edits ambiguous vessel regions.
+          </p>
+          <div class="actions" aria-label="Project links">
+            <a class="button primary" href="assets/relifuse-paper.pdf">Paper PDF</a>
+            <a class="button" href="README.md">Code</a>
+            <a class="button" href="docs/reproducibility.md">Reproducibility</a>
+          </div>
+          <dl class="stats" aria-label="Held-out summary metrics">
+            <div>
+              <dt>Dice</dt>
+              <dd>0.9241</dd>
+            </div>
+            <div>
+              <dt>IoU</dt>
+              <dd>0.8591</dd>
+            </div>
+            <div>
+              <dt>Experts</dt>
+              <dd>K=7</dd>
+            </div>
+          </dl>
+        </div>
+        <figure class="hero-media">
+          <img src="figures/relifuse_end_to_end_pipeline.png" alt="End-to-end ReliFuse pipeline" />
+          <figcaption>
+            Frozen experts produce cached posteriors; ReliFuse performs the matched
+            posterior-fusion stage without RGB features.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="paper-strip" aria-label="Authors and paper summary">
+        <p>
+          Truong P. Le, Truong N. Nguyen, Vinh Le H. Tran, Tram T. Doan,
+          Binh T. Nguyen, Son T. Huynh
+        </p>
+        <p>
+          University of Science, VNU-HCM. Public pulmonary histology benchmark:
+          517 development images and 92 held-out test images.
+        </p>
+      </section>
+
+      <section id="method" class="section split">
+        <div>
+          <p class="eyebrow">Core Idea</p>
+          <h2>Fuse posterior evidence, not RGB features.</h2>
+          <p>
+            ReliFuse treats each frozen segmenter as an imperfect observer. It builds
+            diagnostic ensemble-state features, anchors expert reliability with
+            validation Dice priors, pools calibrated logits, and gates residual
+            corrections by local ambiguity.
+          </p>
+        </div>
+        <div class="steps" aria-label="ReliFuse method steps">
+          <article>
+            <span>01</span>
+            <h3>Diversity-aware expert bank</h3>
+            <p>Select competent but non-redundant frozen models.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Diagnostic state</h3>
+            <p>Summarize consensus, minority evidence, entropy, disagreement, and boundary risk.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Reliability pool</h3>
+            <p>Bias-correct expert logits and weight them by local trust.</p>
+          </article>
+          <article>
+            <span>04</span>
+            <h3>Ambiguity-gated residual</h3>
+            <p>Apply bounded edits where the ensemble is uncertain.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="demo" class="section demo">
+        <div class="section-heading">
+          <p class="eyebrow">Process Demo</p>
+          <h2>Self-simulated ReliFuse flow.</h2>
+          <p>
+            The animation shows seven synthetic expert masks moving through the main
+            ReliFuse components. It visualizes relations among consensus,
+            disagreement, reliability, residual correction, and the final mask.
+          </p>
+        </div>
+        <img class="process-gif" src="assets/relifuse-process.gif" alt="Animated ReliFuse process with seven expert masks, component arrows, intermediate maps, and final fused mask" />
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Architecture</p>
+          <h2>Interpretable intermediate fields.</h2>
+          <p>
+            ReliFuse exposes prior probabilities, ambiguity, correction, reliability,
+            calibration bias, and diagnostic state so the final posterior can be audited.
+          </p>
+        </div>
+        <figure class="wide-figure">
+          <img src="figures/relifuse_overall_architecture.png" alt="ReliFuse posterior-fusion architecture" />
+        </figure>
+      </section>
+
+      <section id="results" class="section results">
+        <div class="section-heading">
+          <p class="eyebrow">Held-out Evaluation</p>
+          <h2>Best mean Dice and IoU in the matched posterior-stack comparison.</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Dice ↑</th>
+                <th>IoU ↑</th>
+                <th>Precision ↑</th>
+                <th>Recall ↑</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Weighted fusion</td>
+                <td>0.9187 ± 0.0244</td>
+                <td>0.8505 ± 0.0414</td>
+                <td>0.9233 ± 0.0305</td>
+                <td>0.9152 ± 0.0365</td>
+              </tr>
+              <tr>
+                <td>D-LEMA</td>
+                <td>0.9225 ± 0.0210</td>
+                <td>0.8568 ± 0.0361</td>
+                <td>0.9193 ± 0.0328</td>
+                <td>0.9268 ± 0.0290</td>
+              </tr>
+              <tr>
+                <td>LC-Fed</td>
+                <td>0.9223 ± 0.0222</td>
+                <td>0.8565 ± 0.0379</td>
+                <td>0.9219 ± 0.0325</td>
+                <td>0.9239 ± 0.0316</td>
+              </tr>
+              <tr>
+                <td>P-MoLE</td>
+                <td>0.9222 ± 0.0210</td>
+                <td>0.8562 ± 0.0361</td>
+                <td>0.9145 ± 0.0318</td>
+                <td>0.9311 ± 0.0292</td>
+              </tr>
+              <tr class="winner">
+                <td>ReliFuse</td>
+                <td>0.9241 ± 0.0139</td>
+                <td>0.8591 ± 0.0241</td>
+                <td>0.9194 ± 0.0299</td>
+                <td>0.9297 ± 0.0188</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section gallery">
+        <div class="section-heading">
+          <p class="eyebrow">Qualitative Evidence</p>
+          <h2>Small-vessel recovery and ambiguity-aware false-positive removal.</h2>
+        </div>
+        <figure>
+          <img src="figures/relifuse_main_qualitative_highlights.png" alt="ReliFuse qualitative highlights" />
+        </figure>
+        <figure>
+          <img src="figures/relifuse_all_method_mask_comparison.png" alt="All-method vessel mask comparison" />
+        </figure>
+      </section>
+
+      <section id="citation" class="section citation">
+        <div>
+          <p class="eyebrow">Citation</p>
+          <h2>Cite ReliFuse</h2>
+        </div>
+        <pre><code>@misc{le2026relifuse,
+  title = {ReliFuse: Reliability-Calibrated Posterior Fusion for Histological Vessel Segmentation},
+  author = {Le, Truong P. and Nguyen, Truong N. and Tran, Vinh Le H. and Doan, Tram T. and Nguyen, Binh T. and Huynh, Son T.},
+  year = {2026}
+}</code></pre>
+      </section>
+    </main>
+
+    <footer>
+      <p>ReliFuse is released under the MIT License.</p>
+      <a href="#top">Back to top</a>
+    </footer>
+  </body>
+</html>

@@ -79,7 +79,23 @@ fit(
 fused_probability = model.fuse([expert_1_probability, expert_2_probability])
 ```
 
-See the executed [two-expert notebook](notebooks/relifuse_two_experts.ipynb) and [reproducibility protocol](docs/reproducibility.md).
+See the [reproducibility protocol](docs/reproducibility.md) for the paper evaluation setup.
+
+## Expert workflows
+
+`K` is always the number of posterior channels passed into `ReliFuse(num_experts=K)`.
+
+1. **User-selected experts, no selector.** Load your own model weights, run them on train/validation/test images, stack their posterior masks as `[B,K,H,W]`, validate them with `use_all_experts`, then train ReliFuse. In this mode `requested_experts` must equal the number of supplied models.
+2. **Selection, then training.** Load candidate model weights, run every candidate on the validation set, call `select_from_validation(..., config=SelectionConfig(max_experts=K))`, subset train/validation/test stacks with `subset_expert_predictions`, then train ReliFuse on the selected stack. Here `K` must be positive and cannot exceed the number of candidate models.
+
+Runnable notebooks:
+
+- [Train with user-selected experts](notebooks/01_train_with_user_selected_experts.ipynb)
+- [Select experts, then train](notebooks/02_select_then_train_reliFuse.ipynb)
+- [Inference with loaded experts](notebooks/03_inference_with_loaded_experts.ipynb)
+
+The notebooks use tiny PyTorch expert checkpoints written to temporary directories so no checkpoints or datasets are committed to git. Replace the synthetic dataset cell with your own dataset loader after verifying its license and access terms.
+Each notebook also renders an example case with the input image, ground-truth mask, every expert prediction, every expert thresholded mask, the ReliFuse probability map, and the final ReliFuse mask.
 
 ## Citation
 

@@ -40,6 +40,89 @@ class SelectionResult:
     disagreement: Tensor
 
 
+@dataclass(frozen=True)
+class ExpertBank:
+    """Resolved expert metadata for the no-selection path."""
+
+    selected_indices: tuple[int, ...]
+    selected_names: tuple[str, ...]
+    families: tuple[str, ...]
+
+    @property
+    def num_experts(self) -> int:
+        return len(self.selected_indices)
+
+
+def _validate_requested_experts(
+    total_experts: int,
+    requested_experts: int | None,
+    *,
+    allow_subset: bool,
+) -> int:
+    if total_experts < 1:
+        raise ValueError("At least one expert model is required")
+    if requested_experts is None:
+        return total_experts
+    if requested_experts < 1:
+        raise ValueError("requested_experts must be positive")
+    if requested_experts > total_experts:
+        raise ValueError(
+            f"requested_experts={requested_experts} exceeds supplied models={total_experts}"
+        )
+    if not allow_subset and requested_experts != total_experts:
+        raise ValueError(
+            "No-selection mode must use every supplied model. Use select_experts or "
+            "select_from_validation when requested_experts is smaller than the model count."
+        )
+    return requested_experts
+
+
+def _resolve_names(names: Sequence[str] | None, experts: int) -> tuple[str, ...]:
+    resolved = tuple(names or [f"expert_{index}" for index in range(experts)])
+    if len(resolved) != experts:
+        raise ValueError("names length must match the expert count")
+    return resolved
+
+
+def use_all_experts(
+    predictions: PredictionInput,
+    names: Sequence[str] | None = None,
+    families: Sequence[str] | None = None,
+    requested_experts: int | None = None,
+) -> ExpertBank:
+    """Validate the explicit user-selected expert path.
+
+    This path performs no model selection: every supplied posterior channel is
+    passed to ``ReliFuse(num_experts=K)``. Therefore ``requested_experts`` must
+    either be omitted or match the number of supplied models.
+    """
+
+    posteriors = stack_predictions(predictions)
+    experts = posteriors.shape[1]
+    _validate_requested_experts(experts, requested_experts, allow_subset=False)
+    resolved_names = _resolve_names(names, experts)
+    resolved_families = tuple(families or ["user_selected"] * experts)
+    if len(resolved_families) != experts:
+        raise ValueError("families length must match the expert count")
+    return ExpertBank(tuple(range(experts)), resolved_names, resolved_families)
+
+
+def subset_expert_predictions(
+    predictions: PredictionInput,
+    selected_indices: Sequence[int],
+) -> Tensor:
+    """Return ``predictions`` with only selected expert channels kept."""
+
+    posteriors = stack_predictions(predictions)
+    indices = tuple(int(index) for index in selected_indices)
+    if not indices:
+        raise ValueError("At least one selected expert index is required")
+    experts = posteriors.shape[1]
+    if any(index < 0 or index >= experts for index in indices):
+        raise ValueError(f"selected_indices must be in [0, {experts - 1}]")
+    return posteriors[:, list(indices)]
+
+
 def pairwise_disagreement(
     predictions: PredictionInput,
     threshold: float = 0.5,
@@ -77,6 +160,7 @@ def select_experts(
     config = config or SelectionConfig()
     posteriors = stack_predictions(predictions)
     experts = posteriors.shape[1]
+    _validate_requested_experts(experts, config.max_experts, allow_subset=True)
     dice_table = torch.as_tensor(fold_dice, dtype=torch.float32)
     recall_table = torch.as_tensor(fold_recall, dtype=torch.float32)
     if dice_table.ndim == 1:
@@ -87,9 +171,7 @@ def select_experts(
         raise ValueError("fold_dice and fold_recall must both have shape [K,F]")
     if len(families) != experts:
         raise ValueError("families length must match the expert count")
-    resolved_names = tuple(names or [f"expert_{index}" for index in range(experts)])
-    if len(resolved_names) != experts:
-        raise ValueError("names length must match the expert count")
+    resolved_names = _resolve_names(names, experts)
 
     quality = dice_table.mean(dim=1)
     minimum_recall = recall_table.amin(dim=1)

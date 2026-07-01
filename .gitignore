@@ -15,6 +15,11 @@ dist/
 venv/
 .env
 .ipynb_checkpoints/
+.jupyter-config/
+.jupyter-data/
+.jupyter-runtime/
+.ipython/
+.matplotlib-cache/
 
 # Editors and operating systems
 .DS_Store

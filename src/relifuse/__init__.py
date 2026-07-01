@@ -8,15 +8,19 @@ from .losses import relifuse_loss
 from .metrics import dice_score, expert_dice_scores, legacy_batch_dice_score
 from .model import ReliFuse, ReliFuseOutput
 from .selection import (
+    ExpertBank,
     SelectionConfig,
     SelectionResult,
     select_experts,
     select_from_validation,
+    subset_expert_predictions,
+    use_all_experts,
 )
 from .training import TrainingHistory, fit, fit_loaders, seed_everything
 
 __all__ = [
     "DIAGNOSTIC_NAMES",
+    "ExpertBank",
     "ReliFuse",
     "ReliFuseConfig",
     "ReliFuseOutput",
@@ -37,6 +41,8 @@ __all__ = [
     "select_experts",
     "select_from_validation",
     "stack_predictions",
+    "subset_expert_predictions",
+    "use_all_experts",
 ]
 
 __version__ = "0.1.0"
