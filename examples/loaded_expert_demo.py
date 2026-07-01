@@ -56,9 +56,9 @@ def make_synthetic_vessel_split(
         slope = torch.empty(()).uniform_(-0.55, 0.55, generator=generator)
         offset = torch.empty(()).uniform_(-0.28, 0.28, generator=generator)
         width = torch.empty(()).uniform_(0.055, 0.105, generator=generator)
-        vessel = torch.exp(-((x - slope * y - offset) / width) ** 2)
-        branch = torch.exp(-((x + 0.65 * y + offset * 0.55) / (width * 1.2)) ** 2)
-        branch *= torch.exp(-((y - 0.08) / 0.45) ** 2)
+        vessel = torch.exp(-(((x - slope * y - offset) / width) ** 2))
+        branch = torch.exp(-(((x + 0.65 * y + offset * 0.55) / (width * 1.2)) ** 2))
+        branch *= torch.exp(-(((y - 0.08) / 0.45) ** 2))
         mask = torch.maximum(vessel, branch * 0.88).gt(0.44).float()
         texture = 0.18 * torch.randn((image_size, image_size), generator=generator)
         image = (0.35 + 0.42 * mask + texture).clamp(0, 1)
@@ -166,7 +166,9 @@ def plot_fusion_case(
 ) -> plt.Figure:
     """Visualize input, ground truth, each expert, and ReliFuse output."""
 
-    names = list(expert_names or [f"expert_{index}" for index in range(expert_probabilities.shape[0])])
+    names = list(
+        expert_names or [f"expert_{index}" for index in range(expert_probabilities.shape[0])]
+    )
     if len(names) != expert_probabilities.shape[0]:
         raise ValueError("expert_names length must match expert_probabilities")
     target_mask = (target.squeeze().detach().cpu() >= 0.5).float()

@@ -2,6 +2,10 @@
 
 **ReliFuse** is a reliability-calibrated posterior-fusion method for histological vessel segmentation. It combines probability maps from frozen segmentation experts, learns which expert is locally trustworthy, and only adjusts the fused posterior where the ensemble is ambiguous. The RGB image is never reused by the fusion head.
 
+## Project website
+
+The GitHub Pages project website is available at <https://letruongzzio.github.io/ReliFuse/>.
+
 <p align="center">
   <img src="figures/relifuse_end_to_end_pipeline.png" alt="ReliFuse end-to-end pipeline" width="100%">
 </p>
@@ -90,9 +94,9 @@ See the [reproducibility protocol](docs/reproducibility.md) for the paper evalua
 
 Runnable notebooks:
 
-- [Train with user-selected experts](notebooks/01_train_with_user_selected_experts.ipynb)
-- [Select experts, then train](notebooks/02_select_then_train_reliFuse.ipynb)
-- [Inference with loaded experts](notebooks/03_inference_with_loaded_experts.ipynb)
+- [Train with user-selected experts](notebooks/train_with_user_selected_experts.ipynb)
+- [Select experts, then train](notebooks/select_then_train_reliFuse.ipynb)
+- [Inference with loaded experts](notebooks/inference_with_loaded_experts.ipynb)
 
 The notebooks use tiny PyTorch expert checkpoints written to temporary directories so no checkpoints or datasets are committed to git. Replace the synthetic dataset cell with your own dataset loader after verifying its license and access terms.
 Each notebook also renders an example case with the input image, ground-truth mask, every expert prediction, every expert thresholded mask, the ReliFuse probability map, and the final ReliFuse mask.
